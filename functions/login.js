@@ -1,66 +1,65 @@
+// login.js (Netlify function)
 const fs = require('fs');
 const path = require('path');
 
-// Define file path
-const USERS_FILE = path.join(__dirname, '../data/users.json');
-const logAction = require('./logConsole');
+exports.handler = async function(event, context) {
+    const { username, password, hwid } = JSON.parse(event.body);
+    
+    const usersFilePath = path.join(__dirname, 'data', 'users.json');
+    const logFilePath = path.join(__dirname, 'data', 'activity_logs.json');  // Log file path
 
-// Load users
-const loadData = (filePath) => {
-  try {
-    const data = fs.readFileSync(filePath, 'utf-8');
-    return JSON.parse(data);
-  } catch (err) {
-    return [];
-  }
-};
+    try {
+        // Read the users file to check if the user exists
+        const usersData = fs.readFileSync(usersFilePath, 'utf8');
+        const users = JSON.parse(usersData);
 
-exports.handler = async (event) => {
-  if (event.httpMethod !== 'POST') {
-    return {
-      statusCode: 405,
-      body: JSON.stringify({ message: 'Method Not Allowed' }),
-    };
-  }
+        const user = users.find(u => u.username === username && u.password === password);
 
-  const { username, password, hwid } = JSON.parse(event.body);
+        if (!user) {
+            return {
+                statusCode: 400,
+                body: JSON.stringify({ message: 'Invalid username or password' })
+            };
+        }
 
-  // Load users from file
-  const users = loadData(USERS_FILE);
-  const user = users.find((user) => user.username === username);
+        // Check HWID (Hardware ID)
+        if (user.hwid !== hwid) {
+            return {
+                statusCode: 403,
+                body: JSON.stringify({ message: 'HWID mismatch' })
+            };
+        }
 
-  if (!user) {
-    return {
-      statusCode: 400,
-      body: JSON.stringify({ message: 'User not found' }),
-    };
-  }
+        // Log the login event
+        const logEntry = {
+            timestamp: Date.now(),
+            action: 'User Logged In',
+            username,
+            hwid
+        };
 
-  // Check password (in a real-world case, you would hash passwords)
-  if (user.password !== password) {
-    return {
-      statusCode: 400,
-      body: JSON.stringify({ message: 'Invalid password' }),
-    };
-  }
+        // Read existing logs
+        let logs = [];
+        if (fs.existsSync(logFilePath)) {
+            const data = fs.readFileSync(logFilePath, 'utf8');
+            logs = JSON.parse(data);
+        }
 
-  // Check HWID
-  if (user.hwid !== hwid) {
-    return {
-      statusCode: 400,
-      body: JSON.stringify({ message: 'HWID mismatch' }),
-    };
-  }
+        // Push the new log entry to logs
+        logs.push(logEntry);
 
-  // Log login activity
-  logAction({
-    action: 'User login',
-    username,
-    inviteKey: 'N/A', // No invite key needed for login
-  });
+        // Write updated logs to the file
+        fs.writeFileSync(logFilePath, JSON.stringify(logs, null, 2));
 
-  return {
-    statusCode: 200,
-    body: JSON.stringify({ message: 'Login successful' }),
-  };
+        return {
+            statusCode: 200,
+            body: JSON.stringify({ message: 'Login successful' })
+        };
+    } catch (err) {
+        console.error('Error logging in', err);
+        return {
+            statusCode: 500,
+            body: JSON.stringify({ message: 'Error logging in' })
+        };
+    }
 };

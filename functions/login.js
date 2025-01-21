@@ -1,47 +1,58 @@
-const admin = require('firebase-admin');
-const serviceAccount = {
-    projectId: process.env.FIREBASE_PROJECT_ID,
-    privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+const fs = require('fs');
+const path = require('path');
+
+// Define file path
+const USERS_FILE = path.join(__dirname, '../data/users.json');
+
+// Load users
+const loadData = (filePath) => {
+  try {
+    const data = fs.readFileSync(filePath, 'utf-8');
+    return JSON.parse(data);
+  } catch (err) {
+    return [];
+  }
 };
 
-admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-});
-const db = admin.firestore();
-
 exports.handler = async (event) => {
-    const { username, password, hwid } = JSON.parse(event.body);
-
-    // Check if user exists
-    const userDoc = await db.collection('users').doc(username).get();
-    if (!userDoc.exists) {
-        return {
-            statusCode: 400,
-            body: JSON.stringify({ message: 'User not found!' }),
-        };
-    }
-
-    const userData = userDoc.data();
-
-    // Check password (hash in production)
-    if (userData.password !== password) {
-        return {
-            statusCode: 400,
-            body: JSON.stringify({ message: 'Incorrect password!' }),
-        };
-    }
-
-    // Check HWID
-    if (userData.hwid !== hwid) {
-        return {
-            statusCode: 400,
-            body: JSON.stringify({ message: 'HWID mismatch!' }),
-        };
-    }
-
+  if (event.httpMethod !== 'POST') {
     return {
-        statusCode: 200,
-        body: JSON.stringify({ message: 'Login successful!' }),
+      statusCode: 405,
+      body: JSON.stringify({ message: 'Method Not Allowed' }),
     };
+  }
+
+  const { username, password, hwid } = JSON.parse(event.body);
+
+  // Load users from file
+  const users = loadData(USERS_FILE);
+  const user = users.find((user) => user.username === username);
+
+  if (!user) {
+    return {
+      statusCode: 400,
+      body: JSON.stringify({ message: 'User not found' }),
+    };
+  }
+
+  // Check password (in a real-world case, you would hash passwords)
+  if (user.password !== password) {
+    return {
+      statusCode: 400,
+      body: JSON.stringify({ message: 'Invalid password' }),
+    };
+  }
+
+  // Check HWID
+  if (user.hwid !== hwid) {
+    return {
+      statusCode: 400,
+      body: JSON.stringify({ message: 'HWID mismatch' }),
+    };
+  }
+
+  return {
+    statusCode: 200,
+    body: JSON.stringify({ message: 'Login successful' }),
+  };
 };

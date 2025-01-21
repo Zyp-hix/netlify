@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Console</title>
+</head>
+<body>
+    <h1>Admin Console - Activity Logs</h1>
+    <table id="logTable">
+        <thead>
+            <tr>
+                <th>Timestamp</th>
+                <th>Action</th>
+                <th>Username</th>
+                <th>Invite Key</th>
+            </tr>
+        </thead>
+        <tbody id="logBody">
+        </tbody>
+    </table>
+
+    <script>
+        // Function to load logs from backend
+        fetch('/.netlify/functions/logConsole')
+            .then(response => response.json())
+            .then(data => {
+                const logTableBody = document.getElementById('logBody');
+                data.logs.forEach(log => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${new Date(log.timestamp).toLocaleString()}</td>
+                        <td>${log.action}</td>
+                        <td>${log.username}</td>
+                        <td>${log.inviteKey || 'N/A'}</td>
+                    `;
+                    logTableBody.appendChild(row);
+                });
+            })
+            .catch(err => console.error(err));
+    </script>
+</body>
+</html>

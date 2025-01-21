@@ -1,82 +1,82 @@
+// register.js (Netlify function)
 const fs = require('fs');
 const path = require('path');
 
-// Define file paths
-const USERS_FILE = path.join(__dirname, '../data/users.json');
-const INVITE_FILE = path.join(__dirname, '../data/invite_keys.json');
-const logAction = require('./logConsole');
+exports.handler = async function(event, context) {
+    const { username, password, hwid, inviteKey } = JSON.parse(event.body);
+    
+    const usersFilePath = path.join(__dirname, 'data', 'users.json');
+    const inviteKeysFilePath = path.join(__dirname, 'data', 'invite_keys.json');
+    const logFilePath = path.join(__dirname, 'data', 'activity_logs.json');  // Log file path
 
-// Load users and invite keys
-const loadData = (filePath) => {
-  try {
-    const data = fs.readFileSync(filePath, 'utf-8');
-    return JSON.parse(data);
-  } catch (err) {
-    return [];
-  }
-};
+    try {
+        // Check if invite key exists and is not used
+        const inviteKeysData = fs.readFileSync(inviteKeysFilePath, 'utf8');
+        const inviteKeys = JSON.parse(inviteKeysData);
+        const inviteKeyData = inviteKeys.find(key => key.key === inviteKey && !key.used);
 
-// Save data to files
-const saveData = (filePath, data) => {
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
-};
+        if (!inviteKeyData) {
+            return {
+                statusCode: 400,
+                body: JSON.stringify({ message: 'Invalid or used invite key' })
+            };
+        }
 
-exports.handler = async (event) => {
-  if (event.httpMethod !== 'POST') {
-    return {
-      statusCode: 405,
-      body: JSON.stringify({ message: 'Method Not Allowed' }),
-    };
-  }
+        // Mark the invite key as used
+        inviteKeyData.used = true;
+        fs.writeFileSync(inviteKeysFilePath, JSON.stringify(inviteKeys, null, 2));
 
-  const { username, password, hwid, inviteKey } = JSON.parse(event.body);
-  
-  // Load invite keys and check if the provided invite key exists
-  const inviteKeys = loadData(INVITE_FILE);
-  const invite = inviteKeys.find((key) => key.key === inviteKey && !key.claimed);
-  
-  if (!invite) {
-    return {
-      statusCode: 400,
-      body: JSON.stringify({ message: 'Invalid or already claimed invite key' }),
-    };
-  }
+        // Register the user
+        let users = [];
+        if (fs.existsSync(usersFilePath)) {
+            const usersData = fs.readFileSync(usersFilePath, 'utf8');
+            users = JSON.parse(usersData);
+        }
 
-  // Check if user already exists
-  const users = loadData(USERS_FILE);
-  const existingUser = users.find((user) => user.username === username);
+        // Check if username already exists
+        if (users.find(user => user.username === username)) {
+            return {
+                statusCode: 400,
+                body: JSON.stringify({ message: 'Username already taken' })
+            };
+        }
 
-  if (existingUser) {
-    return {
-      statusCode: 400,
-      body: JSON.stringify({ message: 'User already exists' }),
-    };
-  }
+        // Add new user to users array
+        users.push({ username, password, hwid });
+        fs.writeFileSync(usersFilePath, JSON.stringify(users, null, 2));
 
-  // Register the new user with HWID
-  const newUser = {
-    username,
-    password,
-    hwid,
-    createdAt: new Date(),
-  };
-  
-  users.push(newUser);
-  saveData(USERS_FILE, users);
+        // Log the registration event
+        const logEntry = {
+            timestamp: Date.now(),
+            action: 'User Registered',
+            username,
+            password,  // Use hashed password in production
+            hwid,
+            inviteKey
+        };
 
-  // Mark the invite key as claimed
-  invite.claimed = true;
-  saveData(INVITE_FILE, inviteKeys);
+        // Read existing logs
+        let logs = [];
+        if (fs.existsSync(logFilePath)) {
+            const data = fs.readFileSync(logFilePath, 'utf8');
+            logs = JSON.parse(data);
+        }
 
-  // Log registration activity
-  logAction({
-    action: 'User registration',
-    username,
-    inviteKey,
-  });
+        // Push the new log entry to logs
+        logs.push(logEntry);
 
-  return {
-    statusCode: 200,
-    body: JSON.stringify({ message: 'User registered successfully' }),
-  };
+        // Write updated logs to the file
+        fs.writeFileSync(logFilePath, JSON.stringify(logs, null, 2));
+
+        return {
+            statusCode: 200,
+            body: JSON.stringify({ message: 'User registered successfully' })
+        };
+    } catch (err) {
+        console.error('Error registering user', err);
+        return {
+            statusCode: 500,
+            body: JSON.stringify({ message: 'Error registering user' })
+        };
+    }
 };

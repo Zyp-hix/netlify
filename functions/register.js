@@ -4,6 +4,7 @@ const path = require('path');
 // Define file paths
 const USERS_FILE = path.join(__dirname, '../data/users.json');
 const INVITE_FILE = path.join(__dirname, '../data/invite_keys.json');
+const logAction = require('./logConsole');
 
 // Load users and invite keys
 const loadData = (filePath) => {
@@ -66,6 +67,13 @@ exports.handler = async (event) => {
   // Mark the invite key as claimed
   invite.claimed = true;
   saveData(INVITE_FILE, inviteKeys);
+
+  // Log registration activity
+  logAction({
+    action: 'User registration',
+    username,
+    inviteKey,
+  });
 
   return {
     statusCode: 200,

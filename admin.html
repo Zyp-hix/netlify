@@ -4,40 +4,71 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Console</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin-top: 50px;
+        }
+        table {
+            width: 80%;
+            margin: 20px auto;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 10px;
+            border: 1px solid #ddd;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+        .log-entry {
+            margin: 10px 0;
+        }
+    </style>
 </head>
 <body>
-    <h1>Admin Console - Activity Logs</h1>
-    <table id="logTable">
-        <thead>
-            <tr>
-                <th>Timestamp</th>
-                <th>Action</th>
-                <th>Username</th>
-                <th>Invite Key</th>
-            </tr>
-        </thead>
-        <tbody id="logBody">
-        </tbody>
-    </table>
+    <h1>Admin Console</h1>
+    <h2>Activity Logs</h2>
+    <div id="logConsole"></div>
+
+    <h2>Generate Invite Key</h2>
+    <button onclick="generateInviteKey()">Generate Invite Key</button>
+    <p id="generatedKey"></p>
 
     <script>
-        // Function to load logs from backend
-        fetch('/.netlify/functions/logConsole')
-            .then(response => response.json())
-            .then(data => {
-                const logTableBody = document.getElementById('logBody');
-                data.logs.forEach(log => {
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td>${new Date(log.timestamp).toLocaleString()}</td>
-                        <td>${log.action}</td>
-                        <td>${log.username}</td>
-                        <td>${log.inviteKey || 'N/A'}</td>
-                    `;
-                    logTableBody.appendChild(row);
-                });
-            })
-            .catch(err => console.error(err));
+        // Fetch logs and display them
+        function loadLogs() {
+            fetch('/.netlify/functions/logConsole')
+                .then(response => response.json())
+                .then(data => {
+                    const logConsoleDiv = document.getElementById('logConsole');
+                    logConsoleDiv.innerHTML = ''; // Clear previous logs
+                    data.logs.forEach(log => {
+                        const logEntry = document.createElement('div');
+                        logEntry.className = 'log-entry';
+                        logEntry.innerHTML = `Timestamp: ${new Date(log.timestamp).toLocaleString()}<br>Action: ${log.action}<br>Username: ${log.username}<br>Invite Key: ${log.inviteKey || 'N/A'}`;
+                        logConsoleDiv.appendChild(logEntry);
+                    });
+                })
+                .catch(err => console.error('Error loading logs:', err));
+        }
+
+        // Call loadLogs on page load
+        window.onload = loadLogs;
+
+        // Generate an invite key
+        function generateInviteKey() {
+            fetch('/.netlify/functions/generate-invite-key')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('generatedKey').innerText = `Generated Key: ${data.inviteKey}`;
+                })
+                .catch(err => console.error('Error generating invite key:', err));
+        }
     </script>
 </body>
 </html>

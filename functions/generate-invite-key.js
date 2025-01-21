@@ -1,27 +1,55 @@
-const admin = require('firebase-admin');
-const serviceAccount = {
-    projectId: process.env.FIREBASE_PROJECT_ID,
-    privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+const fs = require('fs');
+const path = require('path');
+
+// Define file path for invite keys
+const INVITE_FILE = path.join(__dirname, '../data/invite_keys.json');
+
+// Load data
+const loadData = (filePath) => {
+  try {
+    const data = fs.readFileSync(filePath, 'utf-8');
+    return JSON.parse(data);
+  } catch (err) {
+    return [];
+  }
 };
 
-admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-});
-const db = admin.firestore();
+// Save data to file
+const saveData = (filePath, data) => {
+  fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+};
+
+// Generate a random invite key
+const generateInviteKey = () => {
+  return Math.random().toString(36).substr(2, 8);
+};
 
 exports.handler = async (event) => {
-    // Only allow admin to generate invite keys (authentication should be added here)
-    const inviteKey = Math.random().toString(36).substr(2, 8); // Random 8-character invite key
-
-    // Save invite key to Firestore with `claimed` as false
-    await db.collection('invite_keys').doc(inviteKey).set({
-        claimed: false,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-
+  if (event.httpMethod !== 'POST') {
     return {
-        statusCode: 200,
-        body: JSON.stringify({ inviteKey }),
+      statusCode: 405,
+      body: JSON.stringify({ message: 'Method Not Allowed' }),
     };
+  }
+
+  // Generate a new invite key
+  const inviteKey = generateInviteKey();
+  const inviteKeys = loadData(INVITE_FILE);
+
+  // Check if the invite key already exists (unlikely, but just in case)
+  if (inviteKeys.some((key) => key.key === inviteKey)) {
+    return {
+      statusCode: 400,
+      body: JSON.stringify({ message: 'Invite key already exists' }),
+    };
+  }
+
+  // Save the invite key to the file (not yet claimed)
+  inviteKeys.push({ key: inviteKey, claimed: false });
+  saveData(INVITE_FILE, inviteKeys);
+
+  return {
+    statusCode: 200,
+    body: JSON.stringify({ inviteKey }),
+  };
 };

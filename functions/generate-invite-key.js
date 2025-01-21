@@ -3,6 +3,9 @@ const path = require('path');
 
 // Define file path for invite keys
 const INVITE_FILE = path.join(__dirname, '../data/invite_keys.json');
+const ADMIN_USERNAME = 'admin'; // Change this to your admin username
+const ADMIN_PASSWORD = 'admin_password'; // Change this to your admin password
+const logAction = require('./logConsole');
 
 // Load data
 const loadData = (filePath) => {
@@ -32,6 +35,16 @@ exports.handler = async (event) => {
     };
   }
 
+  const { username, password } = JSON.parse(event.body);
+
+  // Validate admin credentials
+  if (username !== ADMIN_USERNAME || password !== ADMIN_PASSWORD) {
+    return {
+      statusCode: 403,
+      body: JSON.stringify({ message: 'Unauthorized' }),
+    };
+  }
+
   // Generate a new invite key
   const inviteKey = generateInviteKey();
   const inviteKeys = loadData(INVITE_FILE);
@@ -47,6 +60,13 @@ exports.handler = async (event) => {
   // Save the invite key to the file (not yet claimed)
   inviteKeys.push({ key: inviteKey, claimed: false });
   saveData(INVITE_FILE, inviteKeys);
+
+  // Log the invite key generation action
+  logAction({
+    action: 'Invite key generated',
+    username: ADMIN_USERNAME,
+    inviteKey,
+  });
 
   return {
     statusCode: 200,

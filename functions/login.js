@@ -3,6 +3,7 @@ const path = require('path');
 
 // Define file path
 const USERS_FILE = path.join(__dirname, '../data/users.json');
+const logAction = require('./logConsole');
 
 // Load users
 const loadData = (filePath) => {
@@ -50,6 +51,13 @@ exports.handler = async (event) => {
       body: JSON.stringify({ message: 'HWID mismatch' }),
     };
   }
+
+  // Log login activity
+  logAction({
+    action: 'User login',
+    username,
+    inviteKey: 'N/A', // No invite key needed for login
+  });
 
   return {
     statusCode: 200,

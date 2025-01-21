@@ -1,43 +1,45 @@
-// login.js (Netlify function)
+// login.js - Netlify function to handle login requests
 const fs = require('fs');
 const path = require('path');
 
+// Assume that user data (including HWID) is stored in a JSON file (you should use a real database in production)
+const usersFilePath = path.join(__dirname, 'users.json');
+
 exports.handler = async function(event, context) {
-    const { username, password, hwid } = JSON.parse(event.body);
-    
-    const usersFilePath = path.join(__dirname, 'data', 'users.json');
-    
-    try {
-        // Read the users file to check if the user exists
-        const usersData = fs.readFileSync(usersFilePath, 'utf8');
-        const users = JSON.parse(usersData);
+  const { username, password, hwid } = JSON.parse(event.body);
 
-        const user = users.find(u => u.username === username && u.password === password);
+  // Read user data from file (mock example)
+  const users = JSON.parse(fs.readFileSync(usersFilePath, 'utf-8'));
+  
+  // Find the user by username
+  const user = users.find(u => u.username === username);
 
-        if (!user) {
-            return {
-                statusCode: 400,
-                body: JSON.stringify({ message: 'Invalid username or password' })
-            };
-        }
+  if (!user) {
+    return {
+      statusCode: 401,
+      body: JSON.stringify({ message: 'Invalid credentials' }),
+    };
+  }
 
-        // Check HWID (Hardware ID)
-        if (user.hwid !== hwid) {
-            return {
-                statusCode: 403,
-                body: JSON.stringify({ message: 'Invalid HWID' })
-            };
-        }
+  // Check if the password is correct
+  if (user.password !== password) {
+    return {
+      statusCode: 401,
+      body: JSON.stringify({ message: 'Invalid credentials' }),
+    };
+  }
 
-        return {
-            statusCode: 200,
-            body: JSON.stringify({ message: 'Login successful' })
-        };
-    } catch (err) {
-        console.error('Error logging in', err);
-        return {
-            statusCode: 500,
-            body: JSON.stringify({ message: 'Error logging in' })
-        };
-    }
+  // Check if the HWID matches
+  if (user.hwid !== hwid) {
+    return {
+      statusCode: 403,
+      body: JSON.stringify({ message: 'Invalid HWID' }),
+    };
+  }
+
+  // Login success
+  return {
+    statusCode: 200,
+    body: JSON.stringify({ message: 'Login successful' }),
+  };
 };
